@@ -1,15 +1,24 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using System.Configuration;
+using System;
+using Core;
 
 namespace ConsoleRunner
 {
     class Program
     {
-        static void Main(string[] args)
+        public static void Main(string[] args)
         {
+            var imgurClientId = ConfigurationManager.AppSettings["imgurClientId"];
+            var imgurClientSecret = ConfigurationManager.AppSettings["imgurClientSecret"];
+
+            var azureKey = ConfigurationManager.AppSettings["azureKey"];
+            var azureRegion = ConfigurationManager.AppSettings["azureRegion"];
+
+            var analyzer = new Analyzer(imgurClientId, imgurClientSecret, azureKey, azureRegion);
+
+            analyzer.Run();
+
+            Console.ReadLine();
         }
     }
 }

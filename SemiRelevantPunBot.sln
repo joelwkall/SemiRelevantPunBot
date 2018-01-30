@@ -5,6 +5,10 @@ VisualStudioVersion = 15.0.27130.2024
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ConsoleRunner", "ConsoleRunner\ConsoleRunner.csproj", "{F906458B-E268-4E71-8D08-FB1E7EC27B74}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ImgurConnector", "ImgurConnector\ImgurConnector.csproj", "{AC6A8DDD-9760-4826-B352-B1E1E153A979}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Core", "Core\Core.csproj", "{92884BEC-BC3E-4058-8AEC-DAA763026B28}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -15,6 +19,14 @@ Global
 		{F906458B-E268-4E71-8D08-FB1E7EC27B74}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{F906458B-E268-4E71-8D08-FB1E7EC27B74}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{F906458B-E268-4E71-8D08-FB1E7EC27B74}.Release|Any CPU.Build.0 = Release|Any CPU
+		{AC6A8DDD-9760-4826-B352-B1E1E153A979}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{AC6A8DDD-9760-4826-B352-B1E1E153A979}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{AC6A8DDD-9760-4826-B352-B1E1E153A979}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{AC6A8DDD-9760-4826-B352-B1E1E153A979}.Release|Any CPU.Build.0 = Release|Any CPU
+		{92884BEC-BC3E-4058-8AEC-DAA763026B28}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{92884BEC-BC3E-4058-8AEC-DAA763026B28}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{92884BEC-BC3E-4058-8AEC-DAA763026B28}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{92884BEC-BC3E-4058-8AEC-DAA763026B28}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
