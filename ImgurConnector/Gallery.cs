@@ -10,14 +10,22 @@ namespace ImgurConnector
 {
     public static class Gallery
     {
-        public static async Task<IEnumerable<GalleryAlbum>> GetAlbums(string clientId)
+        public static IEnumerable<GalleryAlbum> GetAlbums(string clientId)
         {
             var client = new ImgurClient(clientId);
 
             var endpoint = new GalleryEndpoint(client);
-            var albums = await endpoint.GetGalleryAsync(GallerySection.Hot);
 
-            return albums.OfType<GalleryAlbum>();
+            for (int page = 0; page < 100000; page++)
+            {
+                var albumsTask = endpoint.GetGalleryAsync(GallerySection.User, GallerySortOrder.Rising, TimeWindow.All, page, true);
+                albumsTask.Wait();
+
+                foreach (var album in albumsTask.Result.OfType<GalleryAlbum>())
+                {
+                    yield return album;
+                }
+            }
         }
     }
 }

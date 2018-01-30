@@ -59,6 +59,10 @@
       <Project>{92884bec-bc3e-4058-8aec-daa763026b28}</Project>
       <Name>Core</Name>
     </ProjectReference>
+    <ProjectReference Include="..\Scrapers\Scrapers.csproj">
+      <Project>{94932b09-6ae6-46bc-b171-5dd03754fc7d}</Project>
+      <Name>Scrapers</Name>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>
