@@ -31,76 +31,81 @@ namespace Core
 
         public async void Run()
         {
-            var puns = _dataRepo.GetPuns().ToList();
-            var stopWords = _dataRepo.GetStopWords().ToList();
+            using (var writer = new StreamWriter("log.txt")) { 
 
-            var albums = ImgurConnector.Gallery.GetAlbums(_imgurClientId);
+                var puns = _dataRepo.GetPuns().ToList();
+                var stopWords = _dataRepo.GetStopWords().ToList();
 
-            foreach (var album in albums.Where(i => i.ImagesCount == 1))
-            {
-                var imageUrl = album.Images.First().Link;
+                var albums = ImgurConnector.Gallery.GetAlbums(_imgurClientId);
 
-                dynamic j = await MakeAnalysisRequest(imageUrl);
-
-                if (j.statusCode != null && j.statusCode != 200)
+                foreach (var album in albums.Where(i => i.ImagesCount == 1))
                 {
-                    Console.WriteLine("Rate limited.Waiting");
-                    Thread.Sleep(5000);
-                    continue;
-                }
+                    var imageUrl = album.Images.First().Link;
 
-                const int titleWeight = 5;
-                const int tagWeight = 10;
-                const int descriptionWeight = 1;
-                const int captionWeight = 15;
-                const int threshHold = 31;
+                    dynamic j = await MakeAnalysisRequest(imageUrl);
 
-                var labels = new Dictionary<string, double>();
-
-                foreach (var word in GetWords(album.Title))
-                    AddToDic(labels, word, titleWeight);
-
-                if (album.Description != null)
-                {
-                    foreach (var word in GetWords(album.Description))
-                        AddToDic(labels, word, descriptionWeight);
-                }
-
-                if (j.description != null)
-                {
-                    foreach (var tag in j.description.tags)
-                        AddToDic(labels, tag.ToObject<string>(), tagWeight);
-
-                    foreach (var cap in j.description.captions)
+                    if (j.statusCode != null && j.statusCode != 200)
                     {
-                        foreach (var word in cap.text.ToObject<string>().Split(' '))
-                            AddToDic(labels, word, captionWeight);
+                        writer.WriteLine("Rate limited.Waiting");
+                        Thread.Sleep(5000);
+                        continue;
                     }
-                }
 
-                var scoredPuns = puns.Select(p=>new KeyValuePair<string,double>(p,ScorePun(p, labels, stopWords))).OrderByDescending(p => p.Value).ToList();
+                    const int titleWeight = 5;
+                    const int tagWeight = 10;
+                    const int descriptionWeight = 1;
+                    const int captionWeight = 15;
+                    const int threshHold = 31;
 
-                if (scoredPuns.Any(o => o.Value >= threshHold))
-                {
-                    Console.WriteLine();
-                    Console.WriteLine($"title: {album.Title}");
-                    Console.WriteLine($"description: {album.Description}");
-                    Console.WriteLine($"url: {imageUrl}");
+                    var labels = new Dictionary<string, double>();
+
+                    foreach (var word in GetWords(album.Title))
+                        AddToDic(labels, word, titleWeight);
+
+                    if (album.Description != null)
+                    {
+                        foreach (var word in GetWords(album.Description))
+                            AddToDic(labels, word, descriptionWeight);
+                    }
 
                     if (j.description != null)
                     {
                         foreach (var tag in j.description.tags)
-                            Console.WriteLine(tag);
+                            AddToDic(labels, tag.ToObject<string>(), tagWeight);
 
-                        foreach (var c in j.description.captions)
-                            Console.WriteLine(c.text);
+                        foreach (var cap in j.description.captions)
+                        {
+                            foreach (var word in cap.text.ToObject<string>().Split(' '))
+                                AddToDic(labels, word, captionWeight);
+                        }
                     }
 
-                    Console.WriteLine(scoredPuns.First().Key + ": " + scoredPuns.First().Value);
-                    Console.WriteLine();
+                    var scoredPuns = puns.Select(p => new KeyValuePair<string, double>(p, ScorePun(p, labels, stopWords))).OrderByDescending(p => p.Value).ToList();
+
+                    if (scoredPuns.Any(o => o.Value >= threshHold))
+                    {
+                        writer.WriteLine();
+                        writer.WriteLine($"title: {album.Title}");
+                        writer.WriteLine($"description: {album.Description}");
+                        writer.WriteLine($"url: {imageUrl}");
+
+                        if (j.description != null)
+                        {
+                            foreach (var tag in j.description.tags)
+                                writer.WriteLine(tag);
+
+                            foreach (var c in j.description.captions)
+                                writer.WriteLine(c.text);
+                        }
+
+                        writer.WriteLine(scoredPuns.First().Key + ": " + scoredPuns.First().Value);
+                        writer.WriteLine();
+                    }
+                    else
+                        writer.WriteLine("No pun found: " + scoredPuns.First().Value);
+
+                    writer.Flush();
                 }
-                else
-                    Console.WriteLine("No pun found: " + scoredPuns.First().Value);
             }
         }
 
