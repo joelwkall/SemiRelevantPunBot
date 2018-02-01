@@ -16,9 +16,9 @@ namespace ImgurConnector
 
             var endpoint = new GalleryEndpoint(client);
 
-            for (int page = 0; page < 100000; page++)
+            for (int page = 0; page < 50; page++)
             {
-                var albumsTask = endpoint.GetGalleryAsync(GallerySection.User, GallerySortOrder.Rising, TimeWindow.All, page, true);
+                var albumsTask = endpoint.GetGalleryAsync(GallerySection.User, GallerySortOrder.Rising, TimeWindow.Day, page, true);
                 albumsTask.Wait();
 
                 foreach (var album in albumsTask.Result.OfType<GalleryAlbum>())
