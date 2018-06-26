@@ -1,14 +1,7 @@
-﻿using Newtonsoft.Json.Linq;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Net;
-using System.Net.Http;
-using System.Net.Http.Headers;
-using System.Text;
-using System.Threading;
-using System.Threading.Tasks;
 
 namespace Core
 {
@@ -29,33 +22,41 @@ namespace Core
             _dataRepo = dataRepository;
         }
 
+        private void Log(string str)
+        {
+            using (var writer = new StreamWriter("log.txt",true))
+            {
+                writer.WriteLine(str);
+            }
+            Console.WriteLine(str);
+        }
+
         public async void Run()
         {
-            using (var writer = new StreamWriter("log.txt")) { 
+            var puns = _dataRepo.GetPuns().ToList();
+            var stopWords = _dataRepo.GetStopWords().ToList();
+            var seenAlbums = _dataRepo.GetSeenAlbumIds().ToList();
 
-                var puns = _dataRepo.GetPuns().ToList();
-                var stopWords = _dataRepo.GetStopWords().ToList();
+            while (true)
+            {
+                Log("Fetching albums...");
+                var albums = ImgurConnector.Gallery.GetAlbums(_imgurClientId, 500, 1);
 
-                var albums = ImgurConnector.Gallery.GetAlbums(_imgurClientId);
-
-                foreach (var album in albums.Where(i => i.ImagesCount == 1))
+                foreach (var album in albums.Select(w => w.Album).Where(i => i.ImagesCount <= 5))
                 {
-                    var imageUrl = album.Images.First().Link;
-
-                    dynamic j = await MakeAnalysisRequest(imageUrl);
-
-                    if (j.statusCode != null && j.statusCode != 200)
+                    if (seenAlbums.Contains(album.Id))
                     {
-                        writer.WriteLine("Rate limited.Waiting");
-                        Thread.Sleep(5000);
+                        Log("Already seen " + album.Id);
                         continue;
                     }
+
+                    var imageUrl = album.Images.First().Link;
 
                     const int titleWeight = 5;
                     const int tagWeight = 10;
                     const int descriptionWeight = 1;
-                    const int captionWeight = 15;
-                    const int threshHold = 31;
+                    const int threshHold = 15;
+                    const int commentWeight = 2;
 
                     var labels = new Dictionary<string, double>();
 
@@ -68,53 +69,49 @@ namespace Core
                             AddToDic(labels, word, descriptionWeight);
                     }
 
-                    if (j.description != null)
-                    {
-                        foreach (var tag in j.description.tags)
-                            AddToDic(labels, tag.ToObject<string>(), tagWeight);
+                    //TODO: use tags
 
-                        foreach (var cap in j.description.captions)
+                    if (album.CommentCount > 0)
+                    {
+                        var comments = ImgurConnector.Gallery.GetComments(_imgurClientId, album);
+
+                        foreach (var comment in comments)
                         {
-                            foreach (var word in cap.text.ToObject<string>().Split(' '))
-                                AddToDic(labels, word, captionWeight);
+                            foreach (var word in GetWords(comment.CommentText))
+                                AddToDic(labels, word, commentWeight);
                         }
                     }
 
-                    var scoredPuns = puns.Select(p => new KeyValuePair<string, double>(p, ScorePun(p, labels, stopWords))).OrderByDescending(p => p.Value).ToList();
+                    var scoredPuns = puns.Select(p => new KeyValuePair<string, double>(p, ScorePun(p, labels, stopWords, false))).OrderByDescending(p => p.Value).ToList();
 
                     if (scoredPuns.Any(o => o.Value >= threshHold))
                     {
-                        writer.WriteLine();
-                        writer.WriteLine($"title: {album.Title}");
-                        writer.WriteLine($"description: {album.Description}");
-                        writer.WriteLine($"url: {imageUrl}");
+                        Log("");
+                        Log($"title: {album.Title}");
+                        Log($"description: {album.Description}");
+                        Log($"url: {imageUrl}");
 
-                        if (j.description != null)
-                        {
-                            foreach (var tag in j.description.tags)
-                                writer.WriteLine(tag);
-
-                            foreach (var c in j.description.captions)
-                                writer.WriteLine(c.text);
-                        }
-
-                        writer.WriteLine(scoredPuns.First().Key + ": " + scoredPuns.First().Value);
-                        writer.WriteLine();
+                        Log(scoredPuns.First().Key + ": " + scoredPuns.First().Value);
+                        ScorePun(scoredPuns.First().Key, labels, stopWords, true);
+                        Log("");
                     }
                     else
-                        writer.WriteLine("No pun found: " + scoredPuns.First().Value);
+                        Log("No pun found: " + scoredPuns.First().Value);
 
-                    writer.Flush();
+                    seenAlbums.Add(album.Id);
+                    _dataRepo.AddSeenAlbumId(album.Id);
                 }
+
+                Log("Out of albums to process...");
             }
         }
 
         private IEnumerable<string> GetWords(string s)
         {
-            return s.Trim().ToLower().Replace(".", "").Replace(",", "").Replace("?", "").Replace("\"", "").Replace("-", "").Split(' ');
+            return s.Trim().ToLower().Replace(".", "").Replace(",", "").Replace("?", "").Replace("\"", "").Replace("-", "").Replace(":", "").Split(' ');
         }
 
-        private double ScorePun(string pun, Dictionary<string,double> labels, IEnumerable<string> stopwords)
+        private double ScorePun(string pun, Dictionary<string,double> labels, IEnumerable<string> stopwords, bool trace)
         {
             var words = GetWords(pun).Distinct(); //only count words once
 
@@ -134,7 +131,12 @@ namespace Core
                     continue;
 
                 if (labels.TryGetValue(word, out var val))
+                {
+                    if (trace)
+                        Log("Scored " + val + " points for " + word);
+
                     ret += val;
+                }
             }
 
             return ret;
@@ -142,6 +144,11 @@ namespace Core
 
         private void AddToDic(Dictionary<string,double> dic,string key, double value)
         {
+            key = key.ToLower().Trim();
+
+            if (string.IsNullOrEmpty(key))
+                return;
+
             if(dic.TryGetValue(key,out var val))
             {
                 val += value;
@@ -150,68 +157,6 @@ namespace Core
             else
             {
                 dic.Add(key, value);
-            }
-        }
-
-        /// <summary>
-        /// Gets the analysis of the specified image url by using the Computer Vision REST API.
-        /// </summary>
-        /// <param name="imageFilePath">The image file.</param>
-        private async Task<JObject> MakeAnalysisRequest(string imageUrl)
-        {
-            HttpClient client = new HttpClient();
-
-            // Request headers.
-            client.DefaultRequestHeaders.Add("Ocp-Apim-Subscription-Key", _azureKey);
-
-            // Request parameters. A third optional parameter is "details".
-            string requestParameters = "visualFeatures=Categories,Description,Color&language=en";
-
-            // Assemble the URI for the REST API Call.
-            string uri = _azureRegion + "?" + requestParameters;
-
-            HttpResponseMessage response;
-
-            // Request body. Posts a locally stored JPEG image.
-            byte[] byteData = GetImageAsByteArray(imageUrl);
-
-            using (ByteArrayContent content = new ByteArrayContent(byteData))
-            {
-                // This example uses content type "application/octet-stream".
-                // The other content types you can use are "application/json" and "multipart/form-data".
-                content.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
-
-                // Execute the REST API call.
-                response = await client.PostAsync(uri, content);
-
-                // Get the JSON response.
-                string contentString = await response.Content.ReadAsStringAsync();
-
-                return JObject.Parse(contentString);
-            }
-        }
-
-        private byte[] GetImageAsByteArray(string imageUrl)
-        {
-            var request = WebRequest.Create(imageUrl);
-
-            using (var response = request.GetResponse())
-            {
-                using (var stream = response.GetResponseStream())
-                {
-                    using (var reader = new BinaryReader(stream))
-                    {
-                        const int bufferSize = 4096;
-                        using (var ms = new MemoryStream())
-                        {
-                            byte[] buffer = new byte[bufferSize];
-                            int count;
-                            while ((count = reader.Read(buffer, 0, buffer.Length)) != 0)
-                                ms.Write(buffer, 0, count);
-                            return ms.ToArray();
-                        }
-                    }
-                }
             }
         }
     }

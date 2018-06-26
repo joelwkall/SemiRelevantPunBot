@@ -261,3 +261,4 @@ __pycache__/
 *.pyc
 /ConsoleRunner/App.config
 /Scrapers
+/Data/seenAlbumIds.txt
